@@ -2,124 +2,126 @@ import requests
 import json
 
 def get_stirr_data():
-    # Get video categories or series categories
-    video_categories_url = "https://stirr.com/api/videos/categories/?type=is_video"
+    # Get video categories
+    videos_categories_url = "https://stirr.com/api/videos/categories/?type=is_video"
     series_categories_url = "https://stirr.com/api/series/categories/?type=is_series"
     
-    # Choose which type to process (video or series)
-    process_videos = True  # Set to False to process series instead
+    # Get categories for both videos and series
+    videos_categories_response = requests.get(videos_categories_url)
+    series_categories_response = requests.get(series_categories_url)
     
-    if process_videos:
-        # Get video categories
-        response = requests.get(video_categories_url)
-        categories_data = response.json()
-        
-        data = []
-        
-        # Process each category
-        for category in categories_data.get('categories', []):
+    videos_categories_data = videos_categories_response.json()
+    series_categories_data = series_categories_response.json()
+    
+    all_data = []
+    
+    # Process video categories
+    if 'categories' in videos_categories_data:
+        for category in videos_categories_data['categories']:
             category_id = category.get('category_id')
             category_name = category.get('category_name')
             
             # Get videos for this category
-            videos_url = f"https://stirr.com/api/videos/list/?categories={category_id}"
-            videos_response = requests.get(videos_url)
+            videos_list_url = f"https://stirr.com/api/videos/list/?categories={category_id}"
+            videos_response = requests.get(videos_list_url)
             videos_data = videos_response.json()
             
-            # Process videos in this category
-            category_videos = videos_data.get('videos', {}).get('category_videos', {}).get(str(category_id), [])
-            
-            for video in category_videos[:5]:  # Limit to first 5 videos per category
-                video_info = {
-                    "name": video.get('title'),
-                    "category": category_name,
-                    "info": {
-                        "poster": video.get('portrait_thumbs', {}).get('original'),
-                        "plot": video.get('description'),
-                        "rating": video.get('rating'),
-                        "year": video.get('year'),
-                        "duration": video.get('duration_in_seconds')
-                    },
-                    "video": video.get('live')
-                }
-                data.append(video_info)
+            # Process videos
+            if 'videos' in videos_data and 'category_videos' in videos_data['videos']:
+                category_videos = videos_data['videos']['category_videos'].get(str(category_id), [])
                 
-    else:
-        # Get series categories
-        response = requests.get(series_categories_url)
-        categories_data = response.json()
-        
-        data = []
-        
-        # Process each category
-        for category in categories_data.get('categories', [])[:3]:  # Limit to first 3 categories
+                for video in category_videos:
+                    video_data = {
+                        "name": video.get('title'),
+                        "category": category_name,
+                        "info": {
+                            "poster": video.get('portrait_thumbs', {}).get('original') if video.get('portrait_thumbs') else None,
+                            "plot": video.get('description'),
+                            "rating": video.get('rating'),
+                            "year": video.get('year'),
+                            "duration": video.get('duration_in_seconds')
+                        },
+                        "video": video.get('live')
+                    }
+                    all_data.append(video_data)
+    
+    # Process series categories
+    if 'categories' in series_categories_data:
+        for category in series_categories_data['categories']:
             category_id = category.get('category_id')
             category_name = category.get('category_name')
             
             # Get series for this category
-            series_url = f"https://stirr.com/api/series/list/?categories={category_id}"
-            series_response = requests.get(series_url)
+            series_list_url = f"https://stirr.com/api/series/list/?categories={category_id}"
+            series_response = requests.get(series_list_url)
             series_data = series_response.json()
             
-            # Process series in this category
-            category_series = series_data.get('series', {}).get('category_series', {}).get(str(category_id), [])
-            
-            for series in category_series[:2]:  # Limit to first 2 series per category
-                series_id = series.get('series_id')
-                series_info = {
-                    "name": series.get('series_name'),
-                    "category": category_name,
-                    "info": {
-                        "poster": series.get('portrait_thumbs', {}).get('original'),
-                        "plot": series.get('series_description'),
-                        "rating": series.get('rating'),
-                        "year": series.get('year')
-                    },
-                    "seasons": []
-                }
+            # Process series
+            if 'series' in series_data and 'category_series' in series_data['series']:
+                category_series = series_data['series']['category_series'].get(str(category_id), [])
                 
-                # Get seasons for this series
-                seasons_url = f"https://stirr.com/api/season/list/{series_id}"
-                seasons_response = requests.get(seasons_url)
-                seasons_data = seasons_response.json()
-                
-                # Process seasons
-                for season in seasons_data.get('data', {}).get('seasons', [])[:2]:  # Limit to first 2 seasons
-                    season_id = season.get('season_id')
-                    season_number = season.get('sequence')
+                for series in category_series:
+                    series_id = series.get('series_id')
+                    series_name = series.get('series_name')
                     
-                    season_info = {
-                        "season": season_number,
-                        "episodes": []
+                    # Get seasons for this series
+                    season_list_url = f"https://stirr.com/api/season/list/{series_id}"
+                    season_response = requests.get(season_list_url)
+                    season_data = season_response.json()
+                    
+                    seasons_list = []
+                    
+                    # Process seasons
+                    if 'data' in season_data and 'seasons' in season_data['data']:
+                        for season in season_data['data']['seasons']:
+                            season_id = season.get('season_id')
+                            season_number = season.get('sequence')
+                            
+                            # Get episodes for this season
+                            season_data_url = f"https://stirr.com/api/season/data?series_id={series_id}&season_id={season_id}"
+                            episode_response = requests.get(season_data_url)
+                            episode_data = episode_response.json()
+                            
+                            episodes_list = []
+                            
+                            # Process episodes
+                            if 'data' in episode_data:
+                                for episode in episode_data['data']:
+                                    episode_data_item = {
+                                        "episode": episode.get('sequence'),
+                                        "name": episode.get('title'),
+                                        "category": category_name,
+                                        "info": {
+                                            "poster": episode.get('thumbs', {}).get('original') if episode.get('thumbs') else None,
+                                            "plot": episode.get('description'),
+                                            "rating": episode.get('rating'),
+                                            "year": episode.get('year'),
+                                            "duration": episode.get('duration_in_seconds')
+                                        },
+                                        "video": episode.get('live')
+                                    }
+                                    episodes_list.append(episode_data_item)
+                            
+                            season_item = {
+                                "season": season_number,
+                                "episodes": episodes_list
+                            }
+                            seasons_list.append(season_item)
+                    
+                    series_data_item = {
+                        "name": series_name,
+                        "category": category_name,
+                        "info": {
+                            "poster": series.get('portrait_thumbs', {}).get('original') if series.get('portrait_thumbs') else None,
+                            "plot": series.get('series_description'),
+                            "rating": series.get('rating'),
+                            "year": series.get('year')
+                        },
+                        "seasons": seasons_list
                     }
-                    
-                    # Get episodes for this season
-                    episodes_url = f"https://stirr.com/api/season/data?series_id={series_id}&season_id={season_id}"
-                    episodes_response = requests.get(episodes_url)
-                    episodes_data = episodes_response.json()
-                    
-                    # Process episodes
-                    for episode in episodes_data.get('data', [])[:3]:  # Limit to first 3 episodes
-                        episode_info = {
-                            "episode": episode.get('sequence'),
-                            "name": episode.get('title'),
-                            "category": category_name,
-                            "info": {
-                                "poster": episode.get('thumbs', {}).get('original'),
-                                "plot": episode.get('description'),
-                                "rating": episode.get('rating'),
-                                "year": episode.get('year'),
-                                "duration": episode.get('duration_in_seconds')
-                            },
-                            "video": episode.get('live')
-                        }
-                        season_info["episodes"].append(episode_info)
-                    
-                    series_info["seasons"].append(season_info)
-                
-                data.append(series_info)
+                    all_data.append(series_data_item)
     
-    return data
+    return all_data
 
 def save_to_file(data, filename="api/stirr.json"):
     """Save the data to a JSON file"""
@@ -127,12 +129,16 @@ def save_to_file(data, filename="api/stirr.json"):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
-    # Get the data
-    result_data = get_stirr_data()
-    
-    # Print the JSON result
-    print(json.dumps(result_data, indent=2))
-    
-    # Save to file
-    save_to_file(result_data)
-    print(f"\nData saved to api/stirr.json")
+    try:
+        # Get all data
+        data = get_stirr_data()
+        
+        # Print the JSON output
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        
+        # Save to file
+        save_to_file(data)
+        print(f"\nData saved to api/stirr.json")
+        
+    except Exception as e:
+        print(f"Error: {e}")

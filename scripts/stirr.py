@@ -46,7 +46,7 @@ for category in categories_data.get('categories', []):
         videos_list.append(video_obj)
 
 # Save to output file
-with open('output.json', 'w', encoding='utf-8') as f:
+with open('api/stirr.json', 'w', encoding='utf-8') as f:
     json.dump(videos_list, f, indent=2, ensure_ascii=False)
 
-print(f"Saved {len(videos_list)} videos to output.json")
+print(f"Saved {len(videos_list)} videos to api/stirr.json")

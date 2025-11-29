@@ -33,7 +33,7 @@ for video in category_videos:
     videos.append(video_info)
 
 # Save to output file
-with open('/api/stirr.json', 'w', encoding='utf-8') as f:
+with open('../api/stirr.json', 'w', encoding='utf-8') as f:
     json.dump(videos, f, indent=2, ensure_ascii=False)
 
 print("Data saved to stirr.json")

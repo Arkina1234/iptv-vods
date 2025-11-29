@@ -12,7 +12,7 @@ on:
       - '.github/workflows/generate.yml'
 
 jobs:
-  build-playlists:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Allow the job to push changes back to the repo
@@ -43,7 +43,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Stage playlist files (force in case they are in .gitignore); tolerate no-match
-          git add --force *.json || true
+          git add --force api || true
           # If there are staged changes, commit and push; otherwise skip
           if git diff --cached --quiet; then
             echo "No playlist changes to commit."

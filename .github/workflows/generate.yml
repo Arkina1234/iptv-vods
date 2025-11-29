@@ -1,0 +1,52 @@
+name: Generate Files
+on:
+  schedule:
+    # Runs every day at 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Allows manual triggering from the Actions tab
+  push:
+    branches:
+      - main # Optional: Run when the script itself is updated on the main branch
+    paths:
+      - '.github/workflows/generate.yml'
+
+jobs:
+  build-playlists:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Allow the job to push changes back to the repo
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Or your preferred Python version
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run Playlist Generation Script
+        # If you have a single entrypoint script, replace *.py with that filename for clarity
+        run: |
+          python scripts/stirr.py
+      - name: Commit and push generated files
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Stage playlist files (force in case they are in .gitignore); tolerate no-match
+          git add --force *.json || true
+          # If there are staged changes, commit and push; otherwise skip
+          if git diff --cached --quiet; then
+            echo "No playlist changes to commit."
+          else
+            git commit -m "Update files [skip ci]"
+            git push origin HEAD:main
+          fi

@@ -27,21 +27,23 @@ def get_stirr_data():
             videos_data = videos_response.json()
             
             # Process videos
-            if 'videos' in videos_data and 'category_videos' in videos_data['videos']:
-                category_videos = videos_data['videos']['category_videos'].get(str(category_id), [])
+            if ('videos' in videos_data and 
+                'category_videos' in videos_data['videos'] and 
+                str(category_id) in videos_data['videos']['category_videos']):
                 
-                for video in category_videos:
+                for video in videos_data['videos']['category_videos'][str(category_id)]:
                     video_data = {
-                        "name": video.get('title'),
+                        "name": video.get('title', ''),
                         "category": category_name,
                         "info": {
                             "poster": video.get('portrait_thumbs', {}).get('original') if video.get('portrait_thumbs') else None,
+                            "bg": video.get('thumbs', {}).get('original') if video.get('thumbs') else None,
                             "plot": video.get('description'),
                             "rating": video.get('rating'),
                             "year": video.get('year'),
                             "duration": video.get('duration_in_seconds')
                         },
-                        "video": video.get('live')
+                        "video": video.get('live', '')
                     }
                     all_data.append(video_data)
     
@@ -57,39 +59,35 @@ def get_stirr_data():
             series_data = series_response.json()
             
             # Process series
-            if 'series' in series_data and 'category_series' in series_data['series']:
-                category_series = series_data['series']['category_series'].get(str(category_id), [])
+            if ('series' in series_data and 
+                'category_series' in series_data['series'] and 
+                str(category_id) in series_data['series']['category_series']):
                 
-                for series in category_series:
+                for series in series_data['series']['category_series'][str(category_id)]:
                     series_id = series.get('series_id')
-                    series_name = series.get('series_name')
+                    series_seasons = []
                     
                     # Get seasons for this series
                     season_list_url = f"https://stirr.com/api/season/list/{series_id}"
                     season_response = requests.get(season_list_url)
                     season_data = season_response.json()
                     
-                    seasons_list = []
-                    
-                    # Process seasons
-                    if 'data' in season_data and 'seasons' in season_data['data']:
+                    if season_data.get('data') and 'seasons' in season_data['data']:
                         for season in season_data['data']['seasons']:
                             season_id = season.get('season_id')
-                            season_number = season.get('sequence')
+                            season_sequence = season.get('sequence')
+                            episodes_list = []
                             
                             # Get episodes for this season
                             season_data_url = f"https://stirr.com/api/season/data?series_id={series_id}&season_id={season_id}"
                             episode_response = requests.get(season_data_url)
                             episode_data = episode_response.json()
                             
-                            episodes_list = []
-                            
-                            # Process episodes
-                            if 'data' in episode_data:
+                            if episode_data.get('data'):
                                 for episode in episode_data['data']:
                                     episode_data_item = {
                                         "episode": episode.get('sequence'),
-                                        "name": episode.get('title'),
+                                        "name": episode.get('title', ''),
                                         "category": category_name,
                                         "info": {
                                             "poster": episode.get('thumbs', {}).get('original') if episode.get('thumbs') else None,
@@ -98,47 +96,50 @@ def get_stirr_data():
                                             "year": episode.get('year'),
                                             "duration": episode.get('duration_in_seconds')
                                         },
-                                        "video": episode.get('live')
+                                        "video": episode.get('live', '')
                                     }
                                     episodes_list.append(episode_data_item)
                             
-                            season_item = {
-                                "season": season_number,
+                            season_data_item = {
+                                "season": season_sequence,
                                 "episodes": episodes_list
                             }
-                            seasons_list.append(season_item)
+                            series_seasons.append(season_data_item)
                     
                     series_data_item = {
-                        "name": series_name,
+                        "name": series.get('series_name', ''),
                         "category": category_name,
                         "info": {
                             "poster": series.get('portrait_thumbs', {}).get('original') if series.get('portrait_thumbs') else None,
+                            "bg": series.get('thumbs', {}).get('original') if series.get('thumbs') else None,
                             "plot": series.get('series_description'),
                             "rating": series.get('rating'),
                             "year": series.get('year')
                         },
-                        "seasons": seasons_list
+                        "seasons": series_seasons
                     }
                     all_data.append(series_data_item)
     
     return all_data
 
 def save_to_file(data, filename="api/stirr.json"):
-    """Save the data to a JSON file"""
+    """Save data to JSON file"""
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
     try:
-        # Get all data
+        print("Fetching data from STIRR...")
         data = get_stirr_data()
         
-        # Print the JSON output
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print(f"Retrieved {len(data)} items")
         
         # Save to file
         save_to_file(data)
-        print(f"\nData saved to api/stirr.json")
+        print("Data saved to api/stirr.json")
+        
+        # Also print JSON to console
+        print(json.dumps(data, indent=2))
         
     except Exception as e:
         print(f"Error: {e}")
